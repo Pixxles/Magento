@@ -424,16 +424,17 @@ class P3Method extends AbstractMethod {
         $merchantId = $this->getConfigData('merchant_id');
 
         $req = [
-            'merchantID'        => $merchantId,
-            'amount'            => $amount,
-            'transactionUnique' => uniqid(),
-            'orderRef'          => $ref,
-            'countryCode'       => $billingAddress->getCountryId(),
-            'currencyCode'      => $order->getBaseCurrency()->getCode(),
-            'customerName'      => $billingAddress->getName(),
-            'customerAddress'   => $address,
-            'customerEmail'     => $billingAddress->getEmail(),
-            'customerPHPSESSID' => $_COOKIE['PHPSESSID'],
+            'merchantID'            => $merchantId,
+            'amount'                => $amount,
+            'transactionUnique'     => uniqid(),
+            'orderRef'              => $ref,
+            'currencyCode'          => $order->getBaseCurrency()->getCode(),
+            'customerCountryCode'   => $billingAddress->getCountryId(),
+            'customerTown'          => $billingAddress->getCity(),
+            'customerName'          => $billingAddress->getName(),
+            'customerAddress'       => $address,
+            'customerEmail'         => $billingAddress->getEmail(),
+            'customerPHPSESSID'     => $_COOKIE['PHPSESSID'],
         ];
 
         if (filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
