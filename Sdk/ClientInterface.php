@@ -1,7 +1,7 @@
 <?php
 
 
-namespace P3\SDK;
+namespace P3\PaymentGateway\Sdk;
 
 /**
  * Interface ClientInterface

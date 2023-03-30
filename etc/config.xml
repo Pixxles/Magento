@@ -4,10 +4,10 @@
 		<payment>
 			<P3_PaymentGateway>
 				<active>0</active>
-				<title>Credit or Debit Card</title>
-                <merchant_id></merchant_id>
-                <merchant_shared_key></merchant_shared_key>
-                <integration_type>direct</integration_type>
+				<title>Pay with Payment Network</title>
+                <merchant_id>100856</merchant_id>
+                <merchant_shared_key>Circle4Take40Idea</merchant_shared_key>
+                <integration_type>hosted</integration_type>
 				<order_status>pending</order_status>
 				<successful_status>complete</successful_status>
 				<unsuccessful_status>canceled</unsuccessful_status>

@@ -36,7 +36,8 @@ use Psr\Log\LoggerInterface;
 
 use Magento\Quote\Model\QuoteFactory;
 
-class Process extends Action implements HttpPostActionInterface, HttpGetActionInterface, CsrfAwareActionInterface {
+class Process extends Action implements HttpPostActionInterface, HttpGetActionInterface, CsrfAwareActionInterface
+{
     /**
      * @var P3Method
      */
@@ -64,7 +65,8 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
         $this->checkoutSession = $checkoutSession;
     }
 
-    public function execute() {
+    public function execute()
+    {
         try {
             // Make sure we have something to submit for payment
             if ($_SERVER['REQUEST_METHOD'] == 'GET'
@@ -76,17 +78,22 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
                     Integration::TYPE_HOSTED_EMBEDDED
                 ])
             ) {
-                echo $this->gateway->processHostedRequest();
-                exit;
+                $result = $this->gateway->processHostedRequest();
+                $this->getResponse()->setBody($result);
+                return $this->getResponse();
             }
 
             if ($this->gateway->integrationType === Integration::TYPE_DIRECT) {
                 $response = $this->gateway->processDirectRequest();
             }
 
-            $data = $response ?? $_POST;
+            $data = $response ?? $this->getRequest()->getPost();
 
-            $this->gateway->processResponse($data);
+            $process = $this->gateway->processResponse($data);
+            if (!empty($process)) {
+                $this->getResponse()->setBody($process);
+                return $this->getResponse();
+            }
 
             $responseMessage = $data['responseMessage'];
 
@@ -96,12 +103,12 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
                 return $this->redirect('checkout/onepage/success');
             } else {
                 // If the payment was not sucessfull then either redirect back
-                // to the cart if module setting 'redirect to checkout on pay' 
+                // to the cart if module setting 'redirect to checkout on pay'
                 // is true and restore the cart/session or redirect to failure page.
                 if ($this->gateway->redirectToCheckoutOnPayFail) {
-                
+
                     $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-                    $order = $objectManager->create('\Magento\Sales\Model\Order')->loadByIncrementId($_COOKIE['lastOrderID']);
+                    $order = $objectManager->create('\Magento\Sales\Model\Order')->loadByIncrementId($this->getRequest()->getCookie('lastOrderID'));
                     $quoteFactory = $objectManager->create('\Magento\Quote\Model\QuoteFactory');
                     $quote = $quoteFactory->create()->loadByIdWithoutStore($order->getQuoteId());
 
@@ -113,13 +120,13 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
                     }
 
                 } else {
-                    // Redirect to failure page with error.                
+                    // Redirect to failure page with error.
                     $this->messageManager->addErrorMessage("Payment Failed - $responseMessage.");
-                    
+
                     if (isset($data)) {
                         $this->gateway->onFailedTransaction($data);
                     }
-                    return $this->redirect('checkout/onepage/failure', $data);                
+                    return $this->redirect('checkout/onepage/failure', $data);
                 }
             }
 
@@ -130,14 +137,13 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
             if (isset($data)) {
                 $this->gateway->onFailedTransaction($data);
             }
-            
+
             return $this->redirect('checkout/cart');
         }
 
         // If the response can't be handled redirect to cart page with error.
         $this->messageManager->addErrorMessage(__('Something went wrong with the payment, we were not able to process it, please contact support.'));
         return $this->redirect('checkout/cart');
-
     }
 
     public function createCsrfValidationException(RequestInterface $request): ?InvalidRequestException
@@ -150,11 +156,12 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
         return true;
     }
 
-    protected function redirect($path, $data = null) {
+    protected function redirect($path, $data = null)
+    {
         if ((isset($_SERVER['HTTP_X_REQUESTED_WITH'])) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest')) {
-            
+
             if ((isset($data['responseCode']) && $data['responseCode'] != 0)) {
-                
+
                 $result = $this->resultFactory->create('raw');
                 $contents = <<<SCRIPT
 <script>window.top.location.href = "{$this->_url->getUrl($path)}";</script>

@@ -1,100 +1,100 @@
 <?php
 
-namespace P3\SDK;
+namespace P3\PaymentGateway\Sdk;
 
 class CreditCard
 {
-    protected static $cards = array(
+    protected static $cards = [
         // Debit cards must come first, since they have more specific patterns than their credit-card equivalents.
 
-        'visaelectron' => array(
+        'visaelectron' => [
             'type' => 'visaelectron',
             'pattern' => '/^4(026|17500|405|508|844|91[37])/',
-            'length' => array(16),
-            'cvcLength' => array(3),
+            'length' => [16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'maestro' => array(
+        ],
+        'maestro' => [
             'type' => 'maestro',
             'pattern' => '/^(5(018|0[23]|[68])|6(39|7))/',
-            'length' => array(12, 13, 14, 15, 16, 17, 18, 19),
-            'cvcLength' => array(3),
+            'length' => [12, 13, 14, 15, 16, 17, 18, 19],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'forbrugsforeningen' => array(
+        ],
+        'forbrugsforeningen' => [
             'type' => 'forbrugsforeningen',
             'pattern' => '/^600/',
-            'length' => array(16),
-            'cvcLength' => array(3),
+            'length' => [16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'dankort' => array(
+        ],
+        'dankort' => [
             'type' => 'dankort',
             'pattern' => '/^5019/',
-            'length' => array(16),
-            'cvcLength' => array(3),
+            'length' => [16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
+        ],
         // Credit cards
-        'visa' => array(
+        'visa' => [
             'type' => 'visa',
             'pattern' => '/^4/',
-            'length' => array(13, 16),
-            'cvcLength' => array(3),
+            'length' => [13, 16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'mastercard' => array(
+        ],
+        'mastercard' => [
             'type' => 'mastercard',
             'pattern' => '/^(5[0-5]|2[2-7])/',
-            'length' => array(16),
-            'cvcLength' => array(3),
+            'length' => [16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'amex' => array(
+        ],
+        'amex' => [
             'type' => 'amex',
             'pattern' => '/^3[47]/',
             'format' => '/(\d{1,4})(\d{1,6})?(\d{1,5})?/',
-            'length' => array(15),
-            'cvcLength' => array(3, 4),
+            'length' => [15],
+            'cvcLength' => [3, 4],
             'luhn' => true,
-        ),
-        'dinersclub' => array(
+        ],
+        'dinersclub' => [
             'type' => 'dinersclub',
             'pattern' => '/^3[0689]/',
-            'length' => array(14),
-            'cvcLength' => array(3),
+            'length' => [14],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'discover' => array(
+        ],
+        'discover' => [
             'type' => 'discover',
             'pattern' => '/^6([045]|22)/',
-            'length' => array(16),
-            'cvcLength' => array(3),
+            'length' => [16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-        'unionpay' => array(
+        ],
+        'unionpay' => [
             'type' => 'unionpay',
             'pattern' => '/^(62|88)/',
-            'length' => array(16, 17, 18, 19),
-            'cvcLength' => array(3),
+            'length' => [16, 17, 18, 19],
+            'cvcLength' => [3],
             'luhn' => false,
-        ),
-        'jcb' => array(
+        ],
+        'jcb' => [
             'type' => 'jcb',
             'pattern' => '/^35/',
-            'length' => array(16),
-            'cvcLength' => array(3),
+            'length' => [16],
+            'cvcLength' => [3],
             'luhn' => true,
-        ),
-    );
+        ],
+    ];
 
     public static function validCreditCard($number, $type = null)
     {
-        $ret = array(
+        $ret = [
             'valid' => false,
             'number' => '',
             'type' => '',
-        );
+        ];
 
         // Strip non-numeric characters
         $number = preg_replace('/[^0-9]/', '', $number);
@@ -104,11 +104,11 @@ class CreditCard
         }
 
         if (array_key_exists($type, self::$cards) && self::validCard($number, $type)) {
-            return array(
+            return [
                 'valid' => true,
                 'number' => $number,
                 'type' => $type,
-            );
+            ];
         }
 
         return $ret;
@@ -198,12 +198,12 @@ class CreditCard
     {
         $checksum = 0;
         for ($i=(2-(strlen($number) % 2)); $i<=strlen($number); $i+=2) {
-            $checksum += (int) ($number{$i-1});
+            $checksum += (int) (mb_substr($number, $i-1, 1));
         }
 
         // Analyze odd digits in even length strings or even digits in odd length strings.
         for ($i=(strlen($number)% 2) + 1; $i<strlen($number); $i+=2) {
-            $digit = (int) ($number{$i-1}) * 2;
+            $digit = (int) (mb_substr($number, $i-1, 1)) * 2;
             if ($digit < 10) {
                 $checksum += $digit;
             } else {
