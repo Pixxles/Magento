@@ -194,49 +194,6 @@ class P3Method extends AbstractMethod
     public function processDirectRequest(): array
     {
         // v2
-        if (isset($_POST['threeDSMethodData']) || isset($_POST['cres'])) {
-            $req = array(
-                'merchantID' => $this->getConfigData('merchant_id'),
-                'action' => 'SALE',
-                // The following field must be passed to continue the 3DS request
-                'threeDSRef' => $_COOKIE['threeDSRef'],
-                'threeDSResponse' => $_POST,
-            );
-
-            return $this->gateway->directRequest($req);
-        }
-
-        if ($_SERVER['REQUEST_METHOD'] == 'POST'
-            && isset($_POST['cardNumber'], $_POST['cardExpiryMonth'], $_POST['cardExpiryYear'], $_POST['cardCVV'], $_POST['browserInfo'])
-        ) {
-            $args = array_merge(
-                $this->captureOrder(),
-                [
-                    'deviceAcceptContent'		=> (isset($_SERVER['HTTP_ACCEPT']) ? htmlentities($_SERVER['HTTP_ACCEPT']) : null),
-                    'deviceAcceptEncoding'		=> (isset($_SERVER['HTTP_ACCEPT_ENCODING']) ? htmlentities($_SERVER['HTTP_ACCEPT_ENCODING']) : null),
-                    'deviceAcceptLanguage'		=> (isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? htmlentities($_SERVER['HTTP_ACCEPT_LANGUAGE']) : null),
-                    'deviceAcceptCharset'		=> (isset($_SERVER['HTTP_ACCEPT_CHARSET']) ? htmlentities($_SERVER['HTTP_ACCEPT_CHARSET']) : null),
-                ],
-                $_POST['browserInfo'],
-                [
-                    'cardNumber'           => str_replace(' ', '', $_POST['cardNumber']),
-                    'cardExpiryMonth'      => $_POST['cardExpiryMonth'],
-                    'cardExpiryYear'       => $_POST['cardExpiryYear'],
-                    'cardCVV'              => $_POST['cardCVV'],
-                    'threeDSRedirectURL'   => $this->getOrderPlaceRedirectUrl(),
-                ]
-            );
-
-            $response = $this->gateway->directRequest($args);
-            return $response;
-        }
-
-        throw new InvalidArgumentException('Something went wrong with processing direct request, please check $_POST data');
-    }
-
-    public function _processDirectRequest(): array
-    {
-        // v2
         if (!is_null($this->request->getPost('threeDSMethodData'))
             || !is_null($this->request->getPost('cres'))
         ) {
