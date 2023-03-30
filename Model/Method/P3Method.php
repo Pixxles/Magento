@@ -5,37 +5,41 @@ namespace P3\PaymentGateway\Model\Method;
 use BadMethodCallException;
 use Exception;
 use InvalidArgumentException;
-use Magento\Framework\App\ObjectManager;
-use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\DataObject;
 use Magento\Checkout\Model\Session;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\Api\AttributeValueFactory;
 use Magento\Framework\Api\ExtensionAttributesFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Data\Collection\AbstractDb;
+use Magento\Framework\DataObject;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
+use Magento\Framework\Stdlib\Cookie\CookieMetadataFactory;
+use Magento\Framework\Stdlib\CookieManagerInterface;
 use Magento\Framework\UrlInterface;
 use Magento\Payment\Helper\Data;
 use Magento\Payment\Model\InfoInterface;
 use Magento\Payment\Model\Method\AbstractMethod;
 use Magento\Payment\Model\Method\Logger;
-use Magento\Sales\Model\Order\Invoice;
-use Magento\Sales\Model\OrderFactory;
-use P3\PaymentGateway\Model\Source\Integration;
-use P3\SDK\AmountHelper;
-use P3\SDK\Gateway;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Email\Sender\InvoiceSender;
+use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment;
 use Magento\Sales\Model\Order\Payment\Transaction\BuilderInterface;
-use Magento\Sales\Model\Order\Email\Sender\InvoiceSender;
+use Magento\Sales\Model\OrderFactory;
+use P3\PaymentGateway\Model\Source\Integration;
+use P3\PaymentGateway\Sdk\AmountHelper;
+use P3\PaymentGateway\Sdk\Gateway;
 
-class P3Method extends AbstractMethod {
-    
+class P3Method extends AbstractMethod
+{
+
     const VERIFY_ERROR      = 'The signature provided in the response does not match. This response might be fraudulent';
     const PROCESS_ERROR     = 'Sorry, we are unable to process this order (reason: %s). Please correct any faults and try again.';
     const SERVICE_ERROR     = 'SERVICE ERROR - CONTACT ADMIN';
@@ -79,6 +83,20 @@ class P3Method extends AbstractMethod {
      */
     private $customerSession;
 
+    /**
+     * @var RequestInterface
+     */
+    protected $request;
+
+    /**
+     * @var CookieMetadataFactory
+     */
+    protected $cookieMetadataFactory;
+
+    /**
+     * @var \Magento\Framework\Stdlib\CookieManagerInterface
+     */
+    protected $cookieManager;
 
     public function __construct(
         UrlInterface $urlBuilder,
@@ -94,6 +112,9 @@ class P3Method extends AbstractMethod {
         CustomerSession $customerSession,
         BuilderInterface $transactionBuilder,
         InvoiceSender $invoiceSender,
+        RequestInterface $request,
+        CookieMetadataFactory $cookieMetadataFactory,
+        CookieManagerInterface $cookieManager,
         AbstractResource $resource = null,
         AbstractDb $resourceCollection = null,
         array $data = []
@@ -120,16 +141,12 @@ class P3Method extends AbstractMethod {
         $this->currencyCode = $this->getConfigData('currency_code');
         $this->redirectToCheckoutOnPayFail = ($this->getConfigData('redirect_to_checkout_on_failed_payment') ? true : false);
         $this->sendCustomerInvoice = ($this->getConfigData('send_customer_sale_invoice') ? true : false);
+        $this->request = $request;
+        $this->cookieManager = $cookieManager;
+        $this->cookieMetadataFactory = $cookieMetadataFactory;
 
         // Tell our template to load the integration type we need
-        setcookie($this->_code . "_IntegrationMethod", $this->integrationType, [
-            'expires' => time() + 500,
-            'path' => '/',
-            'domain' => $_SERVER['HTTP_HOST'],
-            'secure' => true,
-            'httponly' => false,
-            'samesite' => 'None'
-        ]);
+        $this->setCookie($this->_code . "_IntegrationMethod", $this->integrationType);
 
         $this->gateway = new Gateway(
             $this->getConfigData('merchant_id'),
@@ -146,7 +163,7 @@ class P3Method extends AbstractMethod {
     public function getOrderPlaceRedirectUrl(): string
     {
         $routeParams = [
-            '_secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on',
+            '_secure' => $this->request->getServerValue('HTTPS') == 'on',
         ];
 
         $debug = $this->getConfigData('debug');
@@ -217,34 +234,83 @@ class P3Method extends AbstractMethod {
         throw new InvalidArgumentException('Something went wrong with processing direct request, please check $_POST data');
     }
 
+    public function _processDirectRequest(): array
+    {
+        // v2
+        if (!is_null($this->request->getPost('threeDSMethodData'))
+            || !is_null($this->request->getPost('cres'))
+        ) {
+            $req = [
+                'merchantID' => $this->getConfigData('merchant_id'),
+                'action' => 'SALE',
+                // The following field must be passed to continue the 3DS request
+                'threeDSRef' => $this->cookieManager->getCookie('threeDSRef'),
+                'threeDSResponse' => $this->request->getPost(),
+            ];
+
+            return $this->gateway->directRequest($req);
+        }
+
+        if ($this->request->getMethod() === 'POST' && (
+                !is_null($this->request->getPost('cardNumber'))
+                && !is_null($this->request->getPost('cardExpiryMonth'))
+                && !is_null($this->request->getPost('cardExpiryYear'))
+                && !is_null($this->request->getPost('cardCVV'))
+                && !is_null($this->request->getPost('browserInfo'))
+            )) {
+            $serverKeys = ['HTTP_ACCEPT', 'HTTP_ACCEPT_ENCODING', 'HTTP_ACCEPT_LANGUAGE', 'HTTP_ACCEPT_CHARSET', ];
+            $serverData = [];
+            array_map(function ($key) use (&$serverData) {
+                $data = $this->request->getServer($key);
+                $serverData[$key] = $data ? htmlentities($data) : null;
+            }, $serverKeys);
+
+            $args = array_merge(
+                $this->captureOrder(),
+                [
+                    'deviceAcceptContent'        => $serverData['HTTP_ACCEPT'],
+                    'deviceAcceptEncoding'        => $serverData['HTTP_ACCEPT_ENCODING'],
+                    'deviceAcceptLanguage'        => $serverData['HTTP_ACCEPT_LANGUAGE'],
+                    'deviceAcceptCharset'        => $serverData['HTTP_ACCEPT_CHARSET'],
+                ],
+                $this->request->getPost('browserInfo'),
+                [
+                    'cardNumber'           => str_replace(' ', '', $this->request->getPost('cardNumber')),
+                    'cardExpiryMonth'      => $this->request->getPost('cardExpiryMonth'),
+                    'cardExpiryYear'       => $this->request->getPost('cardExpiryYear'),
+                    'cardCVV'              => $this->request->getPost('cardCVV'),
+                    'threeDSRedirectURL'   => $this->getOrderPlaceRedirectUrl(),
+                ]
+            );
+
+            $response = $this->gateway->directRequest($args);
+            return $response;
+        }
+
+        throw new InvalidArgumentException('Something went wrong with processing direct request, please check $_POST data');
+    }
+
     public function processResponse(array $data)
     {
         $this->createWallet($data);
 
-        $this->gateway->verifyResponse($data, [$this, 'onThreeDSRequired'], [$this, 'onSuccessfulTransaction'], [$this, 'onFailedTransaction']);
+        return $this->gateway->verifyResponse($data, [$this, 'onThreeDSRequired'], [$this, 'onSuccessfulTransaction'], [$this, 'onFailedTransaction']);
     }
 
-    public function onThreeDSRequired($threeDSVersion, $res) {
-
-        setcookie('threeDSRef', $res['threeDSRef'], [
-            'expires' => time() + 500,
-            'path' => '/',
-            'domain' => $_SERVER['HTTP_HOST'],
-            'secure' => true,
-            'httponly' => false,
-            'samesite' => 'None'
-        ]);
+    public function onThreeDSRequired($threeDSVersion, $res): string
+    {
+        $this->setCookie('threeDSRef', $res['threeDSRef']);
 
         // check for version
-        echo Gateway::silentPost($res['threeDSURL'], $res['threeDSRequest']);
+        $result = Gateway::silentPost($res['threeDSURL'], $res['threeDSRequest']);
 
         if ($threeDSVersion >= 200) {
             // Silently POST the 3DS request to the ACS in the IFRAME
             // Remember the threeDSRef as need it when the ACS responds
-            $_SESSION['threeDSRef'] = $res['threeDSRef'];
+            $this->customerSession->setP3ThreeDSRef($res['threeDSRef']);
         }
 
-        exit();
+        return $result;
     }
 
     /**
@@ -335,7 +401,7 @@ class P3Method extends AbstractMethod {
                     $this->invoiceSender->send($invoice);
                     $order->addCommentToStatusHistory(
                         __('Notified customer about invoice creation #%1.', $invoice->getId())
-                       )->setIsCustomerNotified(true)->save();
+                    )->setIsCustomerNotified(true)->save();
                 }
             }
 
@@ -380,7 +446,8 @@ class P3Method extends AbstractMethod {
         $this->_checkoutSession->setLastRealOrderId($order->getIncrementId());
     }
 
-    public function onFailedTransaction($data = null) {
+    public function onFailedTransaction($data = null)
+    {
         if (isset($data['orderRef'], $data['responseCode'])) {
             $status = $this->getConfigData('unsuccessful_status');
 
@@ -388,10 +455,10 @@ class P3Method extends AbstractMethod {
             $order = $this->orderFactory->create();
             $order->loadByIncrementId($orderId);
 
-            $orderMessage = "Payment Unsuccessful <br/><br/>" . 
+            $orderMessage = "Payment Unsuccessful <br/><br/>" .
                 "Message: " . $data['responseMessage'] . "<br/>" .
                 "xref: " . $data['xref'] . "<br/>";
-            
+
             $order->addStatusToHistory($status, $orderMessage, 0);
             $order->save();
         }
@@ -433,7 +500,7 @@ class P3Method extends AbstractMethod {
             'customerName'      => $billingAddress->getName(),
             'customerAddress'   => $address,
             'customerEmail'     => $billingAddress->getEmail(),
-            'customerPHPSESSID' => $_COOKIE['PHPSESSID'],
+            'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),
         ];
 
         if (filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
@@ -443,7 +510,7 @@ class P3Method extends AbstractMethod {
         $req['action'] = 'SALE';
         $req['type'] = 1;
 
-        if(!is_null($billingAddress->getTelephone())) {
+        if (!is_null($billingAddress->getTelephone())) {
             $req["customerPhone"] = $billingAddress->getTelephone();
         }
 
@@ -455,8 +522,7 @@ class P3Method extends AbstractMethod {
         /**
          * Wallets
          */
-        if (
-            $this->getConfigData('customer_wallets_enabled')
+        if ($this->getConfigData('customer_wallets_enabled')
             && $this->integrationType === Integration::TYPE_HOSTED_MODAL
             && $this->customerSession->isLoggedIn()
         ) {
@@ -473,21 +539,14 @@ class P3Method extends AbstractMethod {
             if (count($wallets) > 0) {
                 //Add walletID to request.
                 $req['walletID'] = $wallets[0]['wallet_id'];
-            } 
+            }
             $req['walletEnabled'] = 'Y';
             $req['walletRequired'] = 'Y';
         }
 
-        // Save the orderID as the lastOrderID to a cookie 
+        // Save the orderID as the lastOrderID to a cookie
         // so the customer can be tracked when they return from HPF or ACS.
-        setcookie('lastOrderID', $orderId, [
-            'expires' => time() + 500,
-            'path' => '/',
-            'domain' => $_SERVER['HTTP_HOST'],
-            'secure' => true,
-            'httponly' => false,
-            'samesite' => 'None'
-        ]);
+        $this->setCookie('lastOrderID', $orderId);
 
         return $req;
     }
@@ -497,7 +556,8 @@ class P3Method extends AbstractMethod {
      *
      * A wallet will always be created if a walletID is returned. Even if payment fails.
      */
-    protected function createWallet($response) {
+    protected function createWallet($response)
+    {
         $merchantId = $this->getConfigData('merchant_id');
         $customerEmail = $this->customerSession->getCustomer()->getEmail();
 
@@ -575,5 +635,27 @@ class P3Method extends AbstractMethod {
                 __($exception->getMessage())
             );
         }
+    }
+
+    /**
+     * Sets a cookie with params.
+     *
+     * @param string $name
+     * @param string $value
+     * @return void
+     * @throws \Magento\Framework\Exception\InputException
+     * @throws \Magento\Framework\Stdlib\Cookie\CookieSizeLimitReachedException
+     * @throws \Magento\Framework\Stdlib\Cookie\FailureToSendException
+     */
+    protected function setCookie(string $name, string $value): void
+    {
+        $metadata = $this->cookieMetadataFactory->createPublicCookieMetadata();
+        $metadata->setDuration(500)
+            ->setPath('/')
+            ->setDomain($this->request->getServer('HTTP_HOST'))
+            ->setSecure(true)
+            ->setHttpOnly(false)
+            ->setSameSite('None');
+        $this->cookieManager->setPublicCookie($name, $value, $metadata);
     }
 }

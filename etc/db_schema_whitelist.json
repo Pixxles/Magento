@@ -1,0 +1,9 @@
+{
+    "payment_gateway_wallets": {
+        "column": {
+            "merchant_id": true,
+            "customer_email": true,
+            "wallet_id": true
+        }
+    }
+}

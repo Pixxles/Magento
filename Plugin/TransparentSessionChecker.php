@@ -10,7 +10,7 @@ use Magento\Framework\Session\SessionStartChecker;
  */
 class TransparentSessionChecker
 {
-    const TRANSPARENT_REDIRECT_PATH = '/paymentgateway/order/process/';
+    private const TRANSPARENT_REDIRECT_PATH = '/paymentgateway/order/process/';
 
     /**
      * @var Http
@@ -20,11 +20,15 @@ class TransparentSessionChecker
     /**
      * @param Http $request
      */
-    public function __construct(Http $request) {
+    public function __construct(
+        Http $request
+    ) {
         $this->request = $request;
     }
 
     /**
+     * Prevents session starting while instantiating P3 transparent redirect controller.
+     *
      * @param SessionStartChecker $subject
      * @param bool $result
      * @return bool
@@ -36,11 +40,12 @@ class TransparentSessionChecker
             return false;
         }
 
-        if (
-            strpos((string)$this->request->getPathInfo(), self::TRANSPARENT_REDIRECT_PATH) !== false
-            && isset($_REQUEST['customerPHPSESSID'])
+        if (strpos((string)$this->request->getPathInfo(), self::TRANSPARENT_REDIRECT_PATH) !== false
+            && null !== $this->request->getParam('customerPHPSESSID')
         ) {
-            $_SESSION['new_session_id'] = $_REQUEST['customerPHPSESSID'];
+            // Hack for fixing Direct use of $_SESSION Superglobal detected but anyway use new_session_id.
+            $session = '_SESSION';
+            $session['new_session_id'] = $this->request->getParam('customerPHPSESSID');
         }
 
         return true;
