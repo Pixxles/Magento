@@ -452,11 +452,12 @@ class P3Method extends AbstractMethod
             'amount'            => $amount,
             'transactionUnique' => uniqid(),
             'orderRef'          => $ref,
-            'countryCode'       => $billingAddress->getCountryId(),
             'currencyCode'      => $order->getBaseCurrency()->getCode(),
-            'customerName'      => $billingAddress->getName(),
-            'customerAddress'   => $address,
-            'customerEmail'     => $billingAddress->getEmail(),
+            'customerCountryCode'   => $billingAddress->getCountryId(),
+            'customerTown'          => $billingAddress->getCity(),
+            'customerName'          => $billingAddress->getName(),
+            'customerAddress'       => $address,
+            'customerEmail'         => $billingAddress->getEmail(),
             'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),
         ];
 
