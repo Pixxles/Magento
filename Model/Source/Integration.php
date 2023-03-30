@@ -17,10 +17,7 @@ class Integration implements ArrayInterface
     public function toOptionArray(): array
     {
         return [
-            ['value' => self::TYPE_HOSTED, 'label' => __('Hosted')],
-            ['value' => self::TYPE_HOSTED_MODAL, 'label' => __('Hosted (Modal)')],
-            ['value' => self::TYPE_HOSTED_EMBEDDED, 'label' => __('Hosted (Embedded)')],
             ['value' => self::TYPE_DIRECT, 'label' => __('Direct 3D-Secure')],
-         ];
+        ];
     }
 }
