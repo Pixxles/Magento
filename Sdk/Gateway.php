@@ -50,6 +50,13 @@ class Gateway
     private $client;
 
     /**
+     * We can't use direct _SERVER variable in Magento.
+     *
+     * @var array
+     */
+    private $serverData;
+
+    /**
      * The constructor accepts the following options:
      *  + 'hostedUrl'        - Gateway Hosted API Endpoint
      *  + 'directUrl'        - Gateway Direct API Endpoint
@@ -67,6 +74,7 @@ class Gateway
     {
         $this->merchantID = $merchantID;
         $this->merchantSecret = $merchantSecret;
+        $this->serverData = $options['server_data'] ?? [];
 
         // Prevent insecure requests
         $gatewayURL = str_ireplace('http://', 'https://', $gatewayURL);
@@ -89,7 +97,7 @@ class Gateway
         if (array_key_exists('client', $options)) {
             $this->client = $options['client'];
         } else {
-            $this->client = new Client($this->directUrl);
+            $this->client = new Client($this->directUrl, $this->serverData);
         }
     }
 
@@ -129,7 +137,10 @@ class Gateway
         static::debug(__METHOD__ . '() - args=', func_get_args());
 
         if (!isset($request['redirectURL'])) {
-            $request['redirectURL'] = ($_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+            $schema = ($this->serverData['HTTPS'] ?? '') === 'on' ? 'https' : 'http';
+            $host = $this->serverData['HTTP_HOST'] ?? '';
+            $url = $this->serverData['REQUEST_URI'] ?? '';
+            $request['redirectURL'] = "{$schema}://{$host}/{$url}";
         }
 
         $request['merchantID'] = $this->merchantID;
