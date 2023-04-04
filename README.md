@@ -18,7 +18,7 @@ There are several ways to install the extension:
    
    Execute the following command to install the extension:
    ```
-   composer require pixxles/magento-paymentgateway
+   composer require pixxles/payment-gateway
    ```
 
 * **Copy files**
