@@ -1,5 +1,5 @@
 {
-	"name": "pixxles/paymentgateway",
+	"name": "pixxles/payment-gateway",
 	"description": "Accept payment network payments on your Magento 2 website with hosted & direct integrations",
 	"require": {
 		"php": "~7.4||~8.0",
