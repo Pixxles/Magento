@@ -9,10 +9,22 @@ Supports both Hosted and Direct integrations
 ## Installation
 **Step 1:**
 
-If you are upgrading this module, please make sure to disable the module first with `bin/magento module:disable P3_PaymentGateway`. Afterwards, make sure to delete the `app/code/Pixel` or `app/code/P3` directories that may interfere with the new version. Make sure to delete the `P3_PaymentGateway` row from the `setup_module` table in the database so that any database tables required can get created.
+If you are upgrading this module, please make sure to disable the module first with `bin/magento module:disable P3_PaymentGateway`.
 
 **Step 2:**
-Copy the contents of `httpdocs` to your Magento root directory. If you are asked if you want to replace any existing files, click Yes.
+
+There are several ways to install the extension:
+* **Install the Extension using Composer**
+   
+   Execute the following command to install the extension:
+   ```
+   composer require pixxles/magento-paymentgateway
+   ```
+
+* **Copy files**
+   
+   Make sure to delete `app/code/P3` directories that may interfere with the new version. Make sure to delete the `P3_PaymentGateway` row from the `setup_module` table in the database so that any database tables required can get created.
+   Create a directory `app/code/P3/PaymentGateway` and copy the contents of the plugin to this directory.
 
 **Step 3:**
 Enable the new module using the command `bin/magento module:enable P3_PaymentGateway`
