@@ -17,6 +17,7 @@
  * @copyright  Copyright (c) 2017 P3
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
+
 namespace P3\PaymentGateway\Controller\Order;
 
 use Magento\Checkout\Model\Session;
@@ -53,11 +54,12 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
     private $checkoutSession;
 
     public function __construct(
-        Context $context,
-        P3Method $model,
+        Context         $context,
+        P3Method        $model,
         LoggerInterface $logger,
-        Session $checkoutSession
-    ) {
+        Session         $checkoutSession
+    )
+    {
         parent::__construct($context);
 
         $this->gateway = $model;
@@ -69,7 +71,7 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
     {
         try {
             // Make sure we have something to submit for payment
-            if ($_SERVER['REQUEST_METHOD'] == 'GET'
+            if ($this->getRequest()->getMethod() === 'GET'
                 && $this->checkoutSession->hasQuote() === false
                 && $this->checkoutSession->getLastRealOrder()
                 && in_array($this->gateway->integrationType, [
@@ -87,7 +89,7 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
                 $response = $this->gateway->processDirectRequest();
             }
 
-            $data = $response ?? $this->getRequest()->getPost();
+            $data = $response ?? $this->getRequest()->getPost()->toArray();
 
             $process = $this->gateway->processResponse($data);
             if (!empty($process)) {
@@ -158,8 +160,7 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
 
     protected function redirect($path, $data = null)
     {
-        if ((isset($_SERVER['HTTP_X_REQUESTED_WITH'])) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest')) {
-
+        if ($this->getRequest()->isXmlHttpRequest()) {
             if ((isset($data['responseCode']) && $data['responseCode'] != 0)) {
 
                 $result = $this->resultFactory->create('raw');

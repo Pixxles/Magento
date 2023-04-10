@@ -17,6 +17,7 @@ use Magento\Framework\Data\Collection\AbstractDb;
 use Magento\Framework\DataObject;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
@@ -40,29 +41,42 @@ use P3\PaymentGateway\Sdk\Gateway;
 class P3Method extends AbstractMethod
 {
 
-    const VERIFY_ERROR      = 'The signature provided in the response does not match. This response might be fraudulent';
-    const PROCESS_ERROR     = 'Sorry, we are unable to process this order (reason: %s). Please correct any faults and try again.';
-    const SERVICE_ERROR     = 'SERVICE ERROR - CONTACT ADMIN';
-    const INVALID_REQUEST   = 'INVALID REQUEST';
+    const VERIFY_ERROR = 'The signature provided in the response does not match. This response might be fraudulent';
+    const PROCESS_ERROR = 'Sorry, we are unable to process this order (reason: %s). Please correct any faults and try again.';
+    const SERVICE_ERROR = 'SERVICE ERROR - CONTACT ADMIN';
+    const INVALID_REQUEST = 'INVALID REQUEST';
 
     protected $_countryFactory;
     protected $_checkoutSession;
 
-    protected $_code                   = 'P3_PaymentGateway';
-    protected $_isGateway              = true;
-    protected $_canCapture             = true;
-    protected $_canUseInternal         = true;
-    protected $_canUseCheckout         = true;
-    protected $_canCapturePartial      = true;
-    protected $_isInitializeNeeded     = true;
-    protected $_canReviewPayment       = true;
-    protected $_canRefund              = true;
-    protected $_canVoid                = false;
+    protected $_code = 'P3_PaymentGateway';
+    protected $_isGateway = true;
+    protected $_canCapture = true;
+    protected $_canUseInternal = true;
+    protected $_canUseCheckout = true;
+    protected $_canCapturePartial = true;
+    protected $_isInitializeNeeded = true;
+    protected $_canReviewPayment = true;
+    protected $_canRefund = true;
+    protected $_canVoid = false;
 
     /**
      * @var Gateway
      */
     protected $gateway;
+
+    /**
+     * @var bool
+     */
+    private $active;
+
+    /**
+     * @return bool|int
+     */
+    public function getActive(): bool
+    {
+        return $this->active;
+    }
 
     public $integrationType, $responsive, $countryCode, $currencyCode;
 
@@ -98,27 +112,34 @@ class P3Method extends AbstractMethod
      */
     protected $cookieManager;
 
+    /**
+     * @var \Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
+     */
+    protected $remoteAddress;
+
     public function __construct(
-        UrlInterface $urlBuilder,
-        Context $context,
-        Registry $registry,
+        UrlInterface               $urlBuilder,
+        Context                    $context,
+        Registry                   $registry,
         ExtensionAttributesFactory $extensionFactory,
-        AttributeValueFactory $customAttributeFactory,
-        Data $paymentData,
-        ScopeConfigInterface $scopeConfig,
-        Logger $logger,
-        OrderFactory $orderFactory,
-        Session $checkoutSession,
-        CustomerSession $customerSession,
-        BuilderInterface $transactionBuilder,
-        InvoiceSender $invoiceSender,
-        RequestInterface $request,
-        CookieMetadataFactory $cookieMetadataFactory,
-        CookieManagerInterface $cookieManager,
-        AbstractResource $resource = null,
-        AbstractDb $resourceCollection = null,
-        array $data = []
-    ) {
+        AttributeValueFactory      $customAttributeFactory,
+        Data                       $paymentData,
+        ScopeConfigInterface       $scopeConfig,
+        Logger                     $logger,
+        OrderFactory               $orderFactory,
+        Session                    $checkoutSession,
+        CustomerSession            $customerSession,
+        BuilderInterface           $transactionBuilder,
+        InvoiceSender              $invoiceSender,
+        RequestInterface           $request,
+        CookieMetadataFactory      $cookieMetadataFactory,
+        CookieManagerInterface     $cookieManager,
+        RemoteAddress              $remoteAddress,
+        AbstractResource           $resource = null,
+        AbstractDb                 $resourceCollection = null,
+        array                      $data = []
+    )
+    {
         self::$_urlBuilder = $urlBuilder;
         $this->invoiceSender = $invoiceSender;
 
@@ -144,14 +165,26 @@ class P3Method extends AbstractMethod
         $this->request = $request;
         $this->cookieManager = $cookieManager;
         $this->cookieMetadataFactory = $cookieMetadataFactory;
+        $this->remoteAddress = $remoteAddress;
 
         // Tell our template to load the integration type we need
         $this->setCookie($this->_code . "_IntegrationMethod", $this->integrationType);
 
+        $active = $this->getConfigData('active');
+        $active = (int) $active;
+
+        $gatewayUrl = $this->getConfigData('merchant_gateway_url');
+        if (empty($gatewayUrl) || empty($active)) {
+            $this->active = false;
+        }
+
         $this->gateway = new Gateway(
             $this->getConfigData('merchant_id'),
             $this->getConfigData('merchant_shared_key'),
-            $this->getConfigData('merchant_gateway_url')
+            $gatewayUrl ?? '',
+            [
+                'server_data' => $request->getServer()->toArray(),
+            ]
         );
 
         $this->orderFactory = $orderFactory;
@@ -182,9 +215,9 @@ class P3Method extends AbstractMethod
         $req = array_merge(
             $this->captureOrder(),
             [
-                'redirectURL'       => $this->getOrderPlaceRedirectUrl(),
+                'redirectURL' => $this->getOrderPlaceRedirectUrl(),
                 //'callbackURL'     => $this->getOrderPlaceRedirectUrl(),
-                'formResponsive'    => $this->responsive,
+                'formResponsive' => $this->responsive,
             ]
         );
 
@@ -202,7 +235,7 @@ class P3Method extends AbstractMethod
                 'action' => 'SALE',
                 // The following field must be passed to continue the 3DS request
                 'threeDSRef' => $this->cookieManager->getCookie('threeDSRef'),
-                'threeDSResponse' => $this->request->getPost(),
+                'threeDSResponse' => $this->request->getPost()->toArray(),
             ];
 
             return $this->gateway->directRequest($req);
@@ -215,7 +248,7 @@ class P3Method extends AbstractMethod
                 && !is_null($this->request->getPost('cardCVV'))
                 && !is_null($this->request->getPost('browserInfo'))
             )) {
-            $serverKeys = ['HTTP_ACCEPT', 'HTTP_ACCEPT_ENCODING', 'HTTP_ACCEPT_LANGUAGE', 'HTTP_ACCEPT_CHARSET', ];
+            $serverKeys = ['HTTP_ACCEPT', 'HTTP_ACCEPT_ENCODING', 'HTTP_ACCEPT_LANGUAGE', 'HTTP_ACCEPT_CHARSET',];
             $serverData = [];
             array_map(function ($key) use (&$serverData) {
                 $data = $this->request->getServer($key);
@@ -232,11 +265,11 @@ class P3Method extends AbstractMethod
                 ],
                 $this->request->getPost('browserInfo'),
                 [
-                    'cardNumber'           => str_replace(' ', '', $this->request->getPost('cardNumber')),
-                    'cardExpiryMonth'      => $this->request->getPost('cardExpiryMonth'),
-                    'cardExpiryYear'       => $this->request->getPost('cardExpiryYear'),
-                    'cardCVV'              => $this->request->getPost('cardCVV'),
-                    'threeDSRedirectURL'   => $this->getOrderPlaceRedirectUrl(),
+                    'cardNumber' => str_replace(' ', '', $this->request->getPost('cardNumber')),
+                    'cardExpiryMonth' => $this->request->getPost('cardExpiryMonth'),
+                    'cardExpiryYear' => $this->request->getPost('cardExpiryYear'),
+                    'cardCVV' => $this->request->getPost('cardCVV'),
+                    'threeDSRedirectURL' => $this->getOrderPlaceRedirectUrl(),
                 ]
             );
 
@@ -264,7 +297,8 @@ class P3Method extends AbstractMethod
         if ($threeDSVersion >= 200) {
             // Silently POST the 3DS request to the ACS in the IFRAME
             // Remember the threeDSRef as need it when the ACS responds
-            $this->customerSession->setP3ThreeDSRef($res['threeDSRef']);
+            // @note Never used.
+            // $this->_checkoutSession->setData('threeDSRef', $res['threeDSRef']);
         }
 
         return $result;
@@ -380,7 +414,7 @@ class P3Method extends AbstractMethod
                 ->setOrder($order)
                 ->setTransactionId($data['xref'])
                 ->setAdditionalInformation(
-                    [Payment\Transaction::RAW_DETAILS => (array) $data]
+                    [Payment\Transaction::RAW_DETAILS => (array)$data]
                 )
                 ->setFailSafe(true)
                 //build method creates the transaction and returns the object
@@ -439,7 +473,7 @@ class P3Method extends AbstractMethod
         $billingAddress = $order->getBillingAddress();
 
         // Create a formatted address
-        $address  = ($billingAddress->getStreetLine(1) ? $billingAddress->getStreetLine(1) . ",\n" : '');
+        $address = ($billingAddress->getStreetLine(1) ? $billingAddress->getStreetLine(1) . ",\n" : '');
         $address .= ($billingAddress->getStreetLine(2) ? $billingAddress->getStreetLine(2) . ",\n" : '');
         $address .= ($billingAddress->getCity() ? $billingAddress->getCity() . ",\n" : '');
         $address .= ($billingAddress->getRegion() ? $billingAddress->getRegion() . ",\n" : '');
@@ -448,21 +482,22 @@ class P3Method extends AbstractMethod
         $merchantId = $this->getConfigData('merchant_id');
 
         $req = [
-            'merchantID'        => $merchantId,
-            'amount'            => $amount,
+            'merchantID' => $merchantId,
+            'amount' => $amount,
             'transactionUnique' => uniqid(),
-            'orderRef'          => $ref,
-            'currencyCode'      => $order->getBaseCurrency()->getCode(),
-            'customerCountryCode'   => $billingAddress->getCountryId(),
-            'customerTown'          => $billingAddress->getCity(),
-            'customerName'          => $billingAddress->getName(),
-            'customerAddress'       => $address,
-            'customerEmail'         => $billingAddress->getEmail(),
-            'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),
+            'orderRef' => $ref,
+            'customerCountryCode' => $billingAddress->getCountryId(),
+            'currencyCode' => $order->getBaseCurrency()->getCode(),
+            'customerName' => $billingAddress->getName(),
+            'customerAddress' => $address,
+            'customerEmail' => $billingAddress->getEmail(),
+            'customerTown' => $billingAddress->getCity(),
+            // @note Server side issue.
+            //'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),
         ];
 
-        if (filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            $req['remoteAddress']   = $_SERVER['REMOTE_ADDR'];
+        if (filter_var($this->remoteAddress->getRemoteAddress(), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $req['remoteAddress'] = $this->remoteAddress->getRemoteAddress();
         }
 
         $req['action'] = 'SALE';

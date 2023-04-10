@@ -12,9 +12,18 @@ class Client implements ClientInterface
      */
     private $endpoint;
 
-    public function __construct(string $url)
+    /**
+     * @var array
+     */
+    private $serverData;
+
+    public function __construct(
+        string $url,
+        array $serverData
+    )
     {
         $this->endpoint = $url;
+        $this->serverData = $serverData;
     }
 
     /**
@@ -33,7 +42,7 @@ class Client implements ClientInterface
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_USERAGENT => $_SERVER['HTTP_USER_AGENT'],
+                CURLOPT_USERAGENT => $this->serverData['HTTP_USER_AGENT'] ?? '',
             ];
 
             if (($ch = curl_init($this->endpoint)) === false) {
@@ -51,7 +60,7 @@ class Client implements ClientInterface
             $opts = [
                 'http' => [
                     'method' => 'POST',
-                    'user_agent' => $_SERVER['HTTP_USER_AGENT'],
+                    'user_agent' => $this->serverData['HTTP_USER_AGENT'] ?? '',
                     'header' => 'Content-Type: application/x-www-form-urlencoded',
                     'content' => http_build_query($request, '', '&'),
                     'timeout' => 5,

@@ -17,9 +17,6 @@ class TransparentSessionChecker
      */
     private $request;
 
-    /** @var Session */
-    private $session;
-
     /**
      * @param Http $request
      */
@@ -47,8 +44,9 @@ class TransparentSessionChecker
             && null !== $this->request->getParam('customerPHPSESSID')
         ) {
             // Hack for fixing Direct use of $_SESSION Superglobal detected but anyway use new_session_id.
-            $session = '_SESSION';
-            $session['new_session_id'] = $this->request->getParam('customerPHPSESSID');
+            // @note Never used.
+            // $session = '_SESSION';
+            // $session['new_session_id'] = $this->request->getParam('customerPHPSESSID');
         }
 
         return true;
