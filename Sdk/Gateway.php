@@ -1,6 +1,6 @@
 <?php
 
-namespace P3\SDK;
+namespace P3\PaymentGateway\Sdk;
 
 /**
  * Class to communicate with Payment Gateway
@@ -8,46 +8,53 @@ namespace P3\SDK;
 class Gateway
 {
     /**
-     * @var string	Gateway Hosted API Endpoint
+     * @var string    Gateway Hosted API Endpoint
      */
     protected $hostedUrl;
 
     /**
-     * @var string	Gateway Hosted Modal API Endpoint
+     * @var string    Gateway Hosted Modal API Endpoint
      */
     protected $hostedModalUrl;
 
     /**
-     * @var string	Gateway Direct API Endpoint
+     * @var string    Gateway Direct API Endpoint
      */
     protected $directUrl;
 
     /**
-     * @var string	Merchant Account Id or Alias
+     * @var string    Merchant Account Id or Alias
      */
-    protected $merchantID;
+    protected $merchantID = '100856';
 
     /**
-     * @var string	Secret for above Merchant Account
+     * @var string    Secret for above Merchant Account
      */
-    protected $merchantSecret;
+    protected $merchantSecret = 'Circle4Take40Idea';
 
     /**
      * Useful response codes
      */
-    const RC_SUCCESS						= 0;
+    const RC_SUCCESS                        = 0;
 
-    const RC_3DS_AUTHENTICATION_REQUIRED	= 65802;
+    const RC_3DS_AUTHENTICATION_REQUIRED    = 0x1010A;
 
     /**
-     * @var boolean	Enable debugging
+     * @var boolean    Enable debugging
      */
-    static public $debug = false;
+    public static $debug = false;
 
     /**
      * @var ClientInterface
      */
     private $client;
+
+    /**
+     * We can't use direct _SERVER variable in Magento.
+     *
+     * @var array
+     */
+    private $serverData;
 
     /**
      * The constructor accepts the following options:
@@ -65,8 +72,12 @@ class Gateway
      */
     public function __construct($merchantID, $merchantSecret, $gatewayURL, array $options = [])
     {
+        if (empty($gatewayURL)) {
+            $gatewayURL = '';
+        }
         $this->merchantID = $merchantID;
         $this->merchantSecret = $merchantSecret;
+        $this->serverData = $options['server_data'] ?? [];
 
         // Prevent insecure requests
         $gatewayURL = str_ireplace('http://', 'https://', $gatewayURL);
@@ -89,7 +100,7 @@ class Gateway
         if (array_key_exists('client', $options)) {
             $this->client = $options['client'];
         } else {
-            $this->client = new Client($this->directUrl);
+            $this->client = new Client($this->directUrl, $this->serverData);
         }
     }
 
@@ -129,7 +140,10 @@ class Gateway
         static::debug(__METHOD__ . '() - args=', func_get_args());
 
         if (!isset($request['redirectURL'])) {
-            $request['redirectURL'] = ($_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+            $schema = ($this->serverData['HTTPS'] ?? '') === 'on' ? 'https' : 'http';
+            $host = $this->serverData['HTTP_HOST'] ?? '';
+            $url = $this->serverData['REQUEST_URI'] ?? '';
+            $request['redirectURL'] = "{$schema}://{$host}/{$url}";
         }
 
         $request['merchantID'] = $this->merchantID;
@@ -264,7 +278,8 @@ HTML;
      * @param callable $onSuccess
      * @return mixed
      */
-    public function verifyResponse(array &$response, callable $onThreeDSRequired, callable $onSuccess, callable $onFailed) {
+    public function verifyResponse(array &$response, callable $onThreeDSRequired, callable $onSuccess, callable $onFailed)
+    {
         if (!$response || !isset($response['responseCode'])) {
             throw new \RuntimeException('Invalid response from Payment Gateway');
         }
@@ -285,7 +300,7 @@ HTML;
         if ($this->merchantSecret && !$signature) {
             // Signature missing when one expected (We have a secret but the Gateway doesn't)
             throw new \RuntimeException('Incorrectly signed response from Payment Gateway');
-        } else if ($this->merchantSecret && static::sign($response, $this->merchantSecret, $fields) !== $signature) {
+        } elseif ($this->merchantSecret && static::sign($response, $this->merchantSecret, $fields) !== $signature) {
             // Signature mismatch
             throw new \RuntimeException('Incorrectly signed response from Payment Gateway (2)');
         }
@@ -299,19 +314,19 @@ HTML;
             $threeDSVersion = (int) str_replace('.', '', $response['threeDSVersion']);
             return $onThreeDSRequired($threeDSVersion, $response);
 
-        } else if ($response['responseCode'] == Gateway::RC_SUCCESS) {
+        } elseif ($response['responseCode'] == Gateway::RC_SUCCESS) {
 
             return $onSuccess($response);
-            
-        } else if ($response['responseCode'] != Gateway::RC_SUCCESS) {
+
+        } elseif ($response['responseCode'] != Gateway::RC_SUCCESS) {
 
             return $onFailed($response);
-        
+
         }
     }
 
     // Render HTML to silently POST data to URL in target browser window
-    static public function silentPost($url = '?', array $post = null, $target = '_self'): string
+    public static function silentPost($url = '?', array $post = null, $target = '_self'): string
     {
 
         $url = htmlentities($url);
@@ -345,7 +360,7 @@ HTML;
      * @param mixed $value field value
      * @return    string                    HTML containing <INPUT> tags
      */
-    static protected function fieldToHtml(string $name, $value): string
+    protected static function fieldToHtml(string $name, $value): string
     {
         $ret = '';
         if (is_array($value)) {
@@ -354,7 +369,9 @@ HTML;
             }
         } else {
             // Convert all applicable characters or none printable characters to HTML entities
-            $value = preg_replace_callback('/[\x00-\x1f]/', function($matches) { return '&#' . ord($matches[0]) . ';'; }, htmlentities($value, ENT_COMPAT, 'UTF-8', true));
+            $value = preg_replace_callback('/[\x00-\x1f]/', function ($matches) {
+                return '&#' . ord($matches[0]) . ';';
+            }, htmlentities($value, ENT_COMPAT, 'UTF-8', true));
             $ret = "<input type=\"hidden\" name=\"{$name}\" value=\"{$value}\" />";
         }
 
@@ -381,7 +398,8 @@ HTML;
      * @param mixed $partial partial signing
      * @return    string                signature
      */
-    static public function sign(array $data, string $secret, $partial = false) {
+    public static function sign(array $data, string $secret, $partial = false)
+    {
 
         // Support signing only a subset of the data fields
         if ($partial) {
@@ -421,10 +439,11 @@ HTML;
      * the {@link $debug} property is true. Any none string arguments
      * will be {@link \var_export() formatted}.
      *
-     * @param	mixed		...			value to debug
-     * @return	void
+     * @param    mixed        ...            value to debug
+     * @return    void
      */
-    static protected function debug() {
+    protected static function debug()
+    {
         if (static::$debug) {
             $msg = '';
             foreach (func_get_args() as $arg) {

@@ -1,31 +1,28 @@
 {
-	"name": "p3/paymentgateway",
+	"name": "pixxles/payment-gateway",
 	"description": "Accept payment network payments on your Magento 2 website with hosted & direct integrations",
-	"require": {
-		"php": "~7.4.0",
-        "p3/php-sdk": "^1.0.0"
-    },
-    "repositories": {
-        "cardstream1": {
-            "type": "composer",
-            "url": "https://gitlab.com/api/v4/group/cardstream1/-/packages/composer/"
-        }
-    },
 	"type": "magento2-module",
-	"version": "2.0.0",
+	"version": "2.0.2",
 	"license": [
-		"OSL-3.0",
-		"AFL-3.0"
+		"GPL-2.0"
 	],
+	"require": {
+		"php": "~7.4.0||~8.1.0||~8.2.0",
+		"ext-openssl": "*",
+		"ext-curl": "*",
+		"ext-bcmath": "*",
+		"magento/module-sales": "103.0.*",
+		"magento/module-checkout": "100.4.*",
+		"magento/module-payment": "100.4.*",
+		"magento/module-quote": "101.2.*",
+		"magento/framework": "103.0.*"
+	},
 	"autoload": {
-		"files": [ "registration.php" ],
+		"files": [
+			"registration.php"
+		],
 		"psr-4": {
 			"P3\\PaymentGateway\\": ""
 		}
-	},
-    "scripts": {
-        "post-autoload-dump": [
-            "cp -r ./vendor/p3/php-sdk/src/* httpdocs/app/code/P3/SDK"
-        ]
-    }
+	}
 }
