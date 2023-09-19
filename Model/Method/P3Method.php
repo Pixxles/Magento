@@ -65,6 +65,19 @@ class P3Method extends AbstractMethod
      */
     protected $gateway;
 
+    /**
+     * @var bool
+     */
+    private $active;
+
+    /**
+     * @return bool|int
+     */
+    public function getActive(): bool
+    {
+        return $this->active;
+    }
+
     public $integrationType, $responsive, $countryCode, $currencyCode;
 
     /**
@@ -157,10 +170,18 @@ class P3Method extends AbstractMethod
         // Tell our template to load the integration type we need
         $this->setCookie($this->_code . "_IntegrationMethod", $this->integrationType);
 
+        $active = $this->getConfigData('active');
+        $active = (int) $active;
+
+        $gatewayUrl = $this->getConfigData('merchant_gateway_url');
+        if (empty($gatewayUrl) || empty($active)) {
+            $this->active = false;
+        }
+
         $this->gateway = new Gateway(
             $this->getConfigData('merchant_id'),
             $this->getConfigData('merchant_shared_key'),
-            $this->getConfigData('merchant_gateway_url'),
+            $gatewayUrl ?? '',
             [
                 'server_data' => $request->getServer()->toArray(),
             ]

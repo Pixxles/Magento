@@ -7,7 +7,8 @@
 				<title>Pay with Payment Network</title>
                 <merchant_id>100856</merchant_id>
                 <merchant_shared_key>Circle4Take40Idea</merchant_shared_key>
-                <integration_type>hosted</integration_type>
+                <integration_type>direct</integration_type>
+                <merchant_gateway_url></merchant_gateway_url>
 				<order_status>pending</order_status>
 				<successful_status>complete</successful_status>
 				<unsuccessful_status>canceled</unsuccessful_status>

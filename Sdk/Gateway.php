@@ -72,6 +72,9 @@ class Gateway
      */
     public function __construct($merchantID, $merchantSecret, $gatewayURL, array $options = [])
     {
+        if (empty($gatewayURL)) {
+            $gatewayURL = '';
+        }
         $this->merchantID = $merchantID;
         $this->merchantSecret = $merchantSecret;
         $this->serverData = $options['server_data'] ?? [];
