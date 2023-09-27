@@ -74,31 +74,4 @@ php bin/magento setup:di:compile
 ```
 **The amount, address and name appear to cache upon a checkout**
 Are you using the latest version of this module which fixes this issue?
-
-Branded Version
-----------------------------
-
-Module is designed to be configured according to customer needs, and it could be easily branded via configuration options,
-for cases when it is needed a different name in payment methods or different defaults in configuration options
-please follow the following steps:
-
-1. Update module defaults, located in `httpdocs/app/PaymentGateway/etc/config.xml`
-   
-    it is safe to update following options: [`title`, `merchant_id`, `merchant_shared_key`, `integration_type`]
-    
-    **Note:** for `integration_type` available options are [`hosted`, `iframe`, `hosted_modal`, `direct`]
-    
-
-2. Update label from `httpdocs/app/PaymentGateway/etc/adminhtml/system.xml` to change how the Magento will show your Payment Method
-    
-    ```
-     ...
-     <group id="P3_PaymentGateway" translate="label" type="text" sortOrder="0" showInDefault="1" showInWebsite="1" showInStore="1">
-        
-         <label>My Custom Name</label>
-        
-        <field id="active" translate="label" type="select" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="0">
-     ....
-
-    ```
    
