@@ -2,7 +2,7 @@
 	"name": "pixxles/payment-gateway",
 	"description": "Accept payment network payments on your Magento 2 website with hosted & direct integrations",
 	"type": "magento2-module",
-	"version": "2.0.4",
+	"version": "2.2.0",
 	"license": [
 		"GPL-2.0"
 	],
