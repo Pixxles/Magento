@@ -473,10 +473,10 @@ class P3Method extends AbstractMethod
         $billingAddress = $order->getBillingAddress();
 
         // Create a formatted address
-        $address = ($billingAddress->getStreetLine(1) ? $billingAddress->getStreetLine(1) . ",\n" : '');
-        $address .= ($billingAddress->getStreetLine(2) ? $billingAddress->getStreetLine(2) . ",\n" : '');
-        $address .= ($billingAddress->getCity() ? $billingAddress->getCity() . ",\n" : '');
-        $address .= ($billingAddress->getRegion() ? $billingAddress->getRegion() . ",\n" : '');
+        $address = ($billingAddress->getStreetLine(1) ? $billingAddress->getStreetLine(1) . " " : '');
+        $address .= ($billingAddress->getStreetLine(2) ? $billingAddress->getStreetLine(2) . " " : '');
+        $address .= ($billingAddress->getCity() ? $billingAddress->getCity() . "  " : '');
+        $address .= ($billingAddress->getRegion() ? $billingAddress->getRegion() . " " : '');
         $address .= ($billingAddress->getCountryId() ? $billingAddress->getCountryId() : '');
 
         $merchantId = $this->getConfigData('merchant_id');

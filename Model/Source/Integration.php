@@ -18,6 +18,7 @@ class Integration implements ArrayInterface
     {
         return [
             ['value' => self::TYPE_DIRECT, 'label' => __('Direct 3D-Secure')],
+            ['value' => self::TYPE_HOSTED, 'label' => __('Hosted')],
          ];
     }
 }
