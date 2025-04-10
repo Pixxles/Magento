@@ -189,7 +189,7 @@ HTML;
 	 * @param int $amount
 	 * @return array
 	 */
-	public function refundRequest(string $xref, int $amount): array
+	public function refundRequest(string $xref, int $amountToRefund): array
 	{
 		$queryPayload = [
 			'merchantID' => $this->merchantID,
@@ -199,33 +199,47 @@ HTML;
 
 		$queryPayload['signature'] = static::sign($queryPayload, $this->merchantSecret);
 
-		$paymentInfo = $this->client->post($queryPayload);
+		$transaction = $this->client->post($queryPayload);
 
-		$state = $paymentInfo['state'] ?? null;
+		if (empty($transaction['state'])) {
+			throw new \InvalidArgumentException('Could not get the transaction state for ' . $xref);
+		}
 
-		$payload = [
+		if ((int)$transaction['responseCode'] === 65558) {
+			throw new \InvalidArgumentException('IP blocked primary');
+		}
+
+		// Build the refund request
+		$refundRequest = [
 			'merchantID' => $this->merchantID,
 			'xref' => $xref,
 		];
 
-		switch ($state) {
+		switch ($transaction['state']) {
 			case 'approved':
 			case 'captured':
-				$payload['action'] = 'CANCEL';
+				// If amount to refund is equal to the total amount captured/approved then action is cancel.				
+				if ((int)$transaction['amountReceived'] === (int)$amountToRefund || ((int)$transaction['amountReceived'] - (int)$amountToRefund <= 0)) {
+					$refundRequest['action'] = 'CANCEL';
+				} else {
+					$refundRequest['action'] = 'CAPTURE';
+					$refundRequest['amount'] = ($transaction['amountReceived'] - $amountToRefund);
+				}
 				break;
+
 			case 'accepted':
-				$payload = array_merge($payload, [
-					'type' => 1,
+				$refundRequest = array_merge($refundRequest, [
 					'action' => 'REFUND_SALE',
-					'amount' => $amount,
+					'amount' => $amountToRefund,
 				]);
 				break;
+
 			default:
-				throw new \InvalidArgumentException('Something went wrong, we can\'t find transaction ' . $xref);
+				throw new \InvalidArgumentException('Something went wrong: ' . $xref);
 		}
 
-		$payload['signature'] = static::sign($payload, $this->merchantSecret);
-		$res = $this->client->post($payload);
+		$refundRequest['signature'] = static::sign($refundRequest, $this->merchantSecret);
+		$res = $this->client->post($refundRequest);
 
 		if (isset($res['responseCode']) && $res['responseCode'] == "0") {
 			$orderMessage = ($res['responseCode'] == "0" ? "Refund Successful" : "Refund Unsuccessful") . "<br/><br/>";
@@ -311,11 +325,11 @@ HTML;
 
 		return <<<HTML
 <form id="silentPost" action="{$url}" method="post" target="{$target}">
-    {$fields}
-    <noscript><input type="submit" value="Continue"></noscript>
+	{$fields}
+	<noscript><input type="submit" value="Continue"></noscript>
 </form>
 <script>
-    window.setTimeout('document.forms.silentPost.submit()', 0);
+	window.setTimeout('document.forms.silentPost.submit()', 0);
 </script>
 HTML;
 	}
