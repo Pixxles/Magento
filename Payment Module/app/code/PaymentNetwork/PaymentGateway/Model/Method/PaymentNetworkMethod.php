@@ -58,6 +58,7 @@ class PaymentNetworkMethod extends AbstractMethod {
     protected $_canReviewPayment       = true;
     protected $_canRefund              = true;
     protected $_canVoid                = false;
+    protected $_canRefundInvoicePartial = true;
 
     /**
      * @var Gateway
@@ -566,7 +567,11 @@ class PaymentNetworkMethod extends AbstractMethod {
     {
         return parent::canRefund();
     }
-
+    
+    public function canRefundPartialPerInvoice()
+    {
+        return parent::canRefundPartialPerInvoice();
+    }
 
     /**
      * Refund capture
