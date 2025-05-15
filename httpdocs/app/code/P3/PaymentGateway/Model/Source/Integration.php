@@ -11,18 +11,18 @@ class Integration implements ArrayInterface
     const TYPE_HOSTED_MODAL = 'hosted_modal';
     const TYPE_DIRECT = 'direct';
 
-	/**
-	 * @return array
-	 */
-	public function toOptionArray(): array
+    /**
+     * @return array
+     */
+    public function toOptionArray(): array
     {
-		return [
-			['value' => self::TYPE_HOSTED, 'label' => __('Hosted')],
-			['value' => self::TYPE_HOSTED_MODAL, 'label' => __('Hosted (Modal)')],
-			['value' => self::TYPE_HOSTED_EMBEDDED, 'label' => __('Hosted (Embedded)')],
-			['value' => self::TYPE_DIRECT, 'label' => __('Direct 3D-Secure')],
-		 ];
-	}
+        return [
+            ['value' => self::TYPE_HOSTED, 'label' => __('Hosted')],
+            ['value' => self::TYPE_HOSTED_MODAL, 'label' => __('Hosted (Modal)')],
+            ['value' => self::TYPE_HOSTED_EMBEDDED, 'label' => __('Hosted (Embedded)')],
+            ['value' => self::TYPE_DIRECT, 'label' => __('Direct 3D-Secure')],
+        ];
+    }
 }
 
 
