@@ -3,7 +3,8 @@
 define(
 	[
 		'Magento_Checkout/js/view/payment/default',
-		'mage/url'
+		'mage/url',
+		'mage/cookies',
 	],
 	function (Component, url) {
 		'use strict';
@@ -97,15 +98,25 @@ define(
                 var uri = url.build('paymentgateway/order/process');
 				if (document.cookie.indexOf('P3_PaymentGateway_IntegrationMethod=iframe') > -1 ) {
 					// Remove other payment methods now that product is now an order to gain space
-					jQuery('.payment-method, .payment-option, .form-login').each(function(e) {
+					jQuery('.payment-method, .payment-option, .form-login, .minicart-wrapper, .block block-search, .header links, .field.search, ul.header.links').each(function(e) {
 						jQuery(this).remove();
 					});
+
 					jQuery.get({
 						url: uri,
 						success: function(data) {
 							jQuery('.payment-methods').append(data);
 							jQuery('.loading-mask').remove();
 							jQuery('.payment-methods .step-title').text(title);
+
+							if (data.hasOwnProperty('success')) {
+								if (data.hasOwnProperty('html')) {
+									jQuery('#checkout').html(data.html);
+								} else if (data.hasOwnProperty('path')) {
+									window.location.replace(url.build(data.path));
+								}
+							}
+
 						},
 						fail: function(data) {
 							window.location.replace(uri);
@@ -133,33 +144,35 @@ define(
                         }
                     });
 
-                    jQuery('.payment-method, .payment-option, .form-login').each(function(e) {
+                    jQuery('.payment-method, .payment-option, .form-login, .field.search, ul.header.links').each(function(e) {
                         jQuery(this).remove();
                     });
 
-                    jQuery.post({
-                        url: uri,
-                        data,
-                        success: function(data) {
-                            if (data.hasOwnProperty('success') && data.hasOwnProperty('path')) {
-                                window.location.replace(url.build(data.path));
-                            } else {
-                                jQuery('.payment-methods').append(data);
-                                jQuery('.loading-mask').remove();
-                                jQuery('.payment-methods .step-title').text(title);
-                            }
-                        },
-                        fail: function(data) {
-                            window.location.replace(url.build(data.path));
-                        }
-                    });
-                    return false;
-                } else {
+					jQuery.post({
+						url: uri,
+						data: data,
+						success: function(data) {
+							//checkout
+							jQuery('.loading-mask').remove();
+							jQuery('.payment-methods .step-title').text(title);
+
+							if (data.hasOwnProperty('success')) {
+								if (data.hasOwnProperty('html')) {
+									jQuery('#checkout').html(data.html);
+								} else if (data.hasOwnProperty('path')) {
+									window.location.href = url.build(data.path);
+								}
+							}
+						},
+						fail: function(data) {
+							window.location.replace(url.build(data.path));
+						}
+					});
+					return false;
+				} else {
 					window.location.replace(uri);
 				}
 			}
 		});
 	}
 );
-
-

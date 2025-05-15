@@ -1,6 +1,6 @@
 <?php
 
-namespace P3\PaymentGateway\Sdk;
+namespace P3\PaymentGateway\SDK;
 
 /**
  * Class to communicate with Payment Gateway
@@ -88,14 +88,14 @@ class Gateway
         }
 
         if (preg_match('/paymentform(\/.*)?/', $gatewayURL) == false) {
-            $this->hostedUrl = $gatewayURL.'hosted/';
+            $this->hostedUrl = $gatewayURL . 'hosted/';
         } else {
             $this->hostedUrl = $gatewayURL;
             $gatewayURL = preg_replace('/paymentform(\/.*)?/', '', $gatewayURL, 1);
         }
 
-        $this->hostedModalUrl = $gatewayURL.'hosted/modal/';
-        $this->directUrl = $gatewayURL.'direct/';
+        $this->hostedModalUrl = $gatewayURL . 'hosted/modal/';
+        $this->directUrl = $gatewayURL . 'direct/';
 
         if (array_key_exists('client', $options)) {
             $this->client = $options['client'];
@@ -157,7 +157,7 @@ class Gateway
 
         if ($iframe) {
             $htmlForm = <<<HTML
-<iframe id="paymentgatewayframe" name="paymentgatewayframe" frameBorder="0" seamless="seamless" style="width:699px; height:1100px;margin: 0 auto;display:block;"></iframe>
+<iframe id="paymentgatewayframe" name="paymentgatewayframe" frameBorder="0" seamless="seamless" style="width:100%; height:1200px; margin: 0 auto; display:block;"></iframe>
 HTML;
             $htmlForm .= self::silentPost($url, $request, 'paymentgatewayframe');
         } else {
@@ -200,10 +200,10 @@ HTML;
 
     /**
      * @param string $xref
-     * @param int $amount
+     * @param int $amountToRefund
      * @return array
      */
-    public function refundRequest(string $xref, int $amount): array
+    public function refundRequest(string $xref, int $amountToRefund): array
     {
         $queryPayload = [
             'merchantID' => $this->merchantID,
@@ -213,33 +213,47 @@ HTML;
 
         $queryPayload['signature'] = static::sign($queryPayload, $this->merchantSecret);
 
-        $paymentInfo = $this->client->post($queryPayload);
+        $transaction = $this->client->post($queryPayload);
 
-        $state = $paymentInfo['state'] ?? null;
+        if (empty($transaction['state'])) {
+            throw new \InvalidArgumentException('Could not get the transaction state for ' . $xref);
+        }
 
-        $payload = [
+        if ((int)$transaction['responseCode'] === 65558) {
+            throw new \InvalidArgumentException('IP blocked primary');
+        }
+
+        // Build the refund request
+        $refundRequest = [
             'merchantID' => $this->merchantID,
             'xref' => $xref,
         ];
 
-        switch ($state) {
+        switch ($transaction['state']) {
             case 'approved':
             case 'captured':
-                $payload['action'] = 'CANCEL';
+                // If amount to refund is equal to the total amount captured/approved then action is cancel.
+                if ((int)$transaction['amountReceived'] === (int)$amountToRefund || ((int)$transaction['amountReceived'] - (int)$amountToRefund <= 0)) {
+                    $refundRequest['action'] = 'CANCEL';
+                } else {
+                    $refundRequest['action'] = 'CAPTURE';
+                    $refundRequest['amount'] = ($transaction['amountReceived'] - $amountToRefund);
+                }
                 break;
+
             case 'accepted':
-                $payload = array_merge($payload, [
+                $refundRequest = array_merge($refundRequest, [
                     'type' => 1,
                     'action' => 'REFUND_SALE',
-                    'amount' => $amount,
+                    'amount' => $amountToRefund,
                 ]);
                 break;
             default:
                 throw new \InvalidArgumentException('Something went wrong, we can\'t find transaction '. $xref);
         }
 
-        $payload['signature'] = static::sign($payload, $this->merchantSecret);
-        $res = $this->client->post($payload);
+        $refundRequest['signature'] = static::sign($refundRequest, $this->merchantSecret);
+        $res = $this->client->post($refundRequest);
 
         if (isset($res['responseCode']) && $res['responseCode'] == "0") {
             $orderMessage = ($res['responseCode'] == "0" ? "Refund Successful" : "Refund Unsuccessful") . "<br/><br/>";
@@ -278,7 +292,7 @@ HTML;
      * @param callable $onSuccess
      * @return mixed
      */
-    public function verifyResponse(array &$response, callable $onThreeDSRequired, callable $onSuccess, callable $onFailed)
+    public function verifyResponse(array &$response)
     {
         if (!$response || !isset($response['responseCode'])) {
             throw new \RuntimeException('Invalid response from Payment Gateway');
@@ -305,24 +319,8 @@ HTML;
             throw new \RuntimeException('Incorrectly signed response from Payment Gateway (2)');
         }
 
-        settype($response['responseCode'], 'integer');
+        return true;
 
-        // Check the response code
-        if ($response['responseCode'] === Gateway::RC_3DS_AUTHENTICATION_REQUIRED) {
-
-            // Send request to the ACS server
-            $threeDSVersion = (int) str_replace('.', '', $response['threeDSVersion']);
-            return $onThreeDSRequired($threeDSVersion, $response);
-
-        } elseif ($response['responseCode'] == Gateway::RC_SUCCESS) {
-
-            return $onSuccess($response);
-
-        } elseif ($response['responseCode'] != Gateway::RC_SUCCESS) {
-
-            return $onFailed($response);
-
-        }
     }
 
     // Render HTML to silently POST data to URL in target browser window
