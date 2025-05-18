@@ -296,7 +296,8 @@ class P3Method extends AbstractMethod
         if ($this->gateway->verifyResponse($response)) {
 
             if ((int)$response['responseCode'] === 65802) {
-                return $this->onThreeDSRequired($response);
+                $threeDSVersion = (int) str_replace('.', '', $response['threeDSVersion']);
+                return $this->onThreeDSRequired($threeDSVersion, $response);
             } else if ((int)$response['responseCode'] === 0) {
                 // Create the wallet entry Module side.
                 $this->createWallet($response);
@@ -312,7 +313,8 @@ class P3Method extends AbstractMethod
         $this->setCookie('threeDSRef', $res['threeDSRef']);
 
         // check for version
-        $result = Gateway::silentPost($res['threeDSURL'], $res['threeDSRequest']);
+        // $result = Gateway::silentPost($res['threeDSURL'], $res['threeDSRequest']);
+        $result = ['responseCode'=> 65802, 'threeDSRequest' => $res['threeDSRequest'], 'threeDSURL' => $res['threeDSURL']];
 
         if ($threeDSVersion >= 200) {
             // Silently POST the 3DS request to the ACS in the IFRAME
@@ -520,7 +522,6 @@ class P3Method extends AbstractMethod
             'transactionUnique' => uniqid(),
             'orderRef'          => $ref,
             'customerCountryCode' => $billingAddress->getCountryId(),
-            'countryCode'       => $billingAddress->getCountryId(),
             'currencyCode'      => $order->getBaseCurrency()->getCode(),
             'customerName'      => $billingAddress->getName(),
             'customerAddress'   => $address,

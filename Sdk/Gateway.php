@@ -1,6 +1,6 @@
 <?php
 
-namespace P3\PaymentGateway\SDK;
+namespace P3\PaymentGateway\Sdk;
 
 /**
  * Class to communicate with Payment Gateway

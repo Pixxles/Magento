@@ -26,20 +26,19 @@ use Magento\Framework\App\Action\Context;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\CsrfAwareActionInterface;
-use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\View\Result\PageFactory;
+use Magento\Quote\Model\QuoteFactory;
 use P3\PaymentGateway\Model\Method\P3Method;
 use P3\PaymentGateway\Model\Source\Integration;
-use P3\SDK\Gateway as GatewaySDK;
+use P3\PaymentGateway\Sdk\Gateway as GatewaySDK;
 use Psr\Log\LoggerInterface;
-
-use Magento\Quote\Model\QuoteFactory;
 
 class Process extends Action implements HttpPostActionInterface, HttpGetActionInterface, CsrfAwareActionInterface
 {
