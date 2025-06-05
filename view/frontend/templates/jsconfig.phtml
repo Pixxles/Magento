@@ -1,0 +1,19 @@
+<?php /** @var \P3\PaymentGateway\Block\JsConfig $block */ ?>
+<?php if ($block->isDirectPaymentType()): ?>
+    <script type="text/javascript">
+        window.pnVars = <?= json_encode(
+            $block->getJsConfig(),
+            JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP
+        ) ?>;
+
+        require([
+            'P3_PaymentGateway/js/kount-web-client-sdk'
+        ], function () {
+            require([
+                'P3_PaymentGateway/js/init-sdk'
+            ], function (initSdk) {
+                initSdk(window.pnVars);
+            });
+        });
+    </script>
+<?php endif; ?>

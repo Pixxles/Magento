@@ -122,11 +122,19 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
                 $response = $this->gateway->processDirectRequest();
             }
 
+            $this->logger->debug('processDirectRequest', ['data' => $response]);
+
             $data = $response ?? $this->getRequest()->getPost()->toArray();
+
+            if ((int)$data['responseCode'] === 40002) {
+                $this->messageManager->addErrorMessage("Payment Failed - " . $data['responseMessage'] ?? '');
+                return $this->redirect('checkout/onepage/failure', $data);
+            }
+
             $processedResponse = $this->gateway->processResponse($data);
 
-            if ((int)$processedResponse['responseCode'] === 65802) {
-                return $this->redirect($processedResponse['threeDSURL'], $processedResponse);
+            if ((int)$data['responseCode'] === 65802) {
+                return $this->redirect($data['threeDSURL'], $data);
             }
 
             $lastOrderID = (!empty($processedResponse['lastOrderID']) ? $processedResponse['lastOrderID'] : $_COOKIE['lastOrderID']);
@@ -190,18 +198,29 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
     protected function redirect($path, $processedResponse = null) {
         if ((isset($_SERVER['HTTP_X_REQUESTED_WITH'])) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest')) {
 
-            if ((int)$processedResponse['responseCode'] === 65802)  {
+            if (isset($processedResponse['responseCode']) && (int)$processedResponse['responseCode'] === 65802)  {
 
                 $result = $this->_resultJsonFactory->create();
                 $resultPage = $this->_resultPageFactory->create();
                 $block = $resultPage->getLayout()
                     ->createBlock('P3\PaymentGateway\Block\ThreeDSView')
-                    ->setTemplate('PaymentNetwork_PaymentGateway::threedsview.phtml')
+                    ->setTemplate('P3_PaymentGateway::threedsview.phtml')
                     ->setData('threeDSURL', $processedResponse['threeDSURL'])
                     ->setData('threeDSRequest', $processedResponse['threeDSRequest'])
                     ->toHtml();
 
                 $result->setData(['success' => true, 'html' => $block]);
+
+                return $result;
+            }
+
+            if (isset($processedResponse['responseCode']) && (int)$processedResponse['responseCode'] === 40002)  {
+                $this->logger->debug('processedResponse called with data', ['data' => $processedResponse]);
+                $result = $this->resultFactory->create('raw');
+                $contents = <<<SCRIPT
+<script>window.top.location.href = "{$this->_url->getUrl($path)}";</script>
+SCRIPT;
+                $result->setContents($contents);
 
                 return $result;
             }
@@ -221,7 +240,7 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
 SCRIPT;
             $result->setContents($contents);
 
-        } elseif ((int)$processedResponse['responseCode'] === 65802) {
+        } elseif (isset($processedResponse['responseCode']) && (int)$processedResponse['responseCode'] === 65802) {
 
             $result = $this->resultFactory->create('raw');
             $contents = GatewaySDK::silentPost($path, $processedResponse['threeDSRequest']);

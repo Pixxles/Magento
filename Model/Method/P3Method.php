@@ -281,6 +281,7 @@ class P3Method extends AbstractMethod
                     'cardExpiryYear' => $this->request->getPost('cardExpiryYear'),
                     'cardCVV' => $this->request->getPost('cardCVV'),
                     'threeDSRedirectURL' => $this->getOrderPlaceRedirectUrl(),
+                    'sessionId' => $this->request->getPost('sessionId'),
                 ]
             );
 
@@ -313,8 +314,7 @@ class P3Method extends AbstractMethod
         $this->setCookie('threeDSRef', $res['threeDSRef']);
 
         // check for version
-        // $result = Gateway::silentPost($res['threeDSURL'], $res['threeDSRequest']);
-        $result = ['responseCode'=> 65802, 'threeDSRequest' => $res['threeDSRequest'], 'threeDSURL' => $res['threeDSURL']];
+        $result = Gateway::silentPost($res['threeDSURL'], $res['threeDSRequest']);
 
         if ($threeDSVersion >= 200) {
             // Silently POST the 3DS request to the ACS in the IFRAME
@@ -485,8 +485,6 @@ class P3Method extends AbstractMethod
             $order->save();
         }
 
-        $data['lastOrderID'] = $order->getIncrementId();
-
         return $data;
     }
 
@@ -510,9 +508,11 @@ class P3Method extends AbstractMethod
         // Create a formatted address
         $address = ($billingAddress->getStreetLine(1) ? $billingAddress->getStreetLine(1) . " " : '');
         $address .= ($billingAddress->getStreetLine(2) ? $billingAddress->getStreetLine(2) . " " : '');
-        $address .= ($billingAddress->getCity() ? $billingAddress->getCity() . "  " : '');
-        $address .= ($billingAddress->getRegion() ? $billingAddress->getRegion() . " " : '');
-        $address .= ($billingAddress->getCountryId() ? $billingAddress->getCountryId() : '');
+        if ($this->integrationType === Integration::TYPE_DIRECT) {
+            $address .= ($billingAddress->getCity() ? $billingAddress->getCity() . "  " : '');
+            $address .= ($billingAddress->getRegion() ? $billingAddress->getRegion() . " " : '');
+            $address .= ($billingAddress->getCountryId() ? $billingAddress->getCountryId() : '');
+        }
 
         $merchantId = $this->getConfigData('merchant_id');
 
@@ -526,7 +526,7 @@ class P3Method extends AbstractMethod
             'customerName'      => $billingAddress->getName(),
             'customerAddress'   => $address,
             'customerEmail'     => $billingAddress->getEmail(),
-            'customerTown' => $billingAddress->getCity()
+            'customerTown' => $billingAddress->getCity(),
             ];
             // @note Server side issue.
             //'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),        ];
@@ -574,14 +574,7 @@ class P3Method extends AbstractMethod
 
         // Save the orderID as the lastOrderID to a cookie
         // so the customer can be tracked when they return from HPF or ACS.
-        setcookie('lastOrderID', $orderId, [
-            'expires' => time() + 500,
-            'path' => '/',
-            'domain' => $_SERVER['HTTP_HOST'],
-            'secure' => true,
-            'httponly' => false,
-            'samesite' => 'None'
-        ]);
+        $this->setCookie('lastOrderID', $orderId);
 
         return $req;
     }
