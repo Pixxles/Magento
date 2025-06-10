@@ -44,7 +44,7 @@ class JsConfig extends Template
         return [
             'integrationType' => $this->scopeConfig->getValue(self::XML_PATH_INTEGRATION_TYPE, ScopeInterface::SCOPE_STORE),
             'sessionId' => $sessionId,
-            'environment' => 'TEST',
+            'environment' => 'PROD',
             'merchant_id' => 102444,
         ];
     }

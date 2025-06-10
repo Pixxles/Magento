@@ -527,9 +527,9 @@ class P3Method extends AbstractMethod
             'customerAddress'   => $address,
             'customerEmail'     => $billingAddress->getEmail(),
             'customerTown' => $billingAddress->getCity(),
-            ];
-            // @note Server side issue.
-            //'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),        ];
+        ];
+        // @note Server side issue.
+        //'customerPHPSESSID' => $this->cookieManager->getCookie('PHPSESSID'),        ];
 
         if (filter_var($this->remoteAddress->getRemoteAddress(), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             $req['remoteAddress'] = $this->remoteAddress->getRemoteAddress();

@@ -122,14 +122,7 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
                 $response = $this->gateway->processDirectRequest();
             }
 
-            $this->logger->debug('processDirectRequest', ['data' => $response]);
-
             $data = $response ?? $this->getRequest()->getPost()->toArray();
-
-            if ((int)$data['responseCode'] === 40002) {
-                $this->messageManager->addErrorMessage("Payment Failed - " . $data['responseMessage'] ?? '');
-                return $this->redirect('checkout/onepage/failure', $data);
-            }
 
             $processedResponse = $this->gateway->processResponse($data);
 
@@ -215,12 +208,13 @@ class Process extends Action implements HttpPostActionInterface, HttpGetActionIn
             }
 
             if (isset($processedResponse['responseCode']) && (int)$processedResponse['responseCode'] === 40002)  {
-                $this->logger->debug('processedResponse called with data', ['data' => $processedResponse]);
-                $result = $this->resultFactory->create('raw');
-                $contents = <<<SCRIPT
-<script>window.top.location.href = "{$this->_url->getUrl($path)}";</script>
-SCRIPT;
-                $result->setContents($contents);
+                $this->checkoutSession->setErrorMessage(
+                    __("Payment Failed - %1", $processedResponse['responseMessage'])
+                );
+
+                /** @var Json $result */
+                $result = $this->resultFactory->create('json');
+                $result->setData(['success' => true, 'path' => $path]);
 
                 return $result;
             }
