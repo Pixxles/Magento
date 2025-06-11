@@ -7,7 +7,7 @@
 		<label data-bind="attr: {'for': getCode()}" class="label"><span data-bind="text: getTitle()"></span></label>
 	</div>
 	<div class="payment-method-content">
-		 <!-- ko foreach: getRegion('messages') -->
+		<!-- ko foreach: getRegion('messages') -->
 		<!-- ko template: getTemplate() --><!-- /ko -->
 		<!--/ko-->
 		<div class="payment-method-billing-address">
@@ -41,7 +41,9 @@
 				</label>
 				<div class="control">
 					<input
-						type="text"
+						type="number"
+						maxlength="21"
+						oninput="this.value=this.value.slice(0, this.maxLength)"
 						placeholder="Card Number"
 						name="cardNumber"
 						class="input-text required"
@@ -66,6 +68,7 @@
 								<input
 									type="number"
 									maxlength="2"
+									oninput="this.value=this.value.slice(0, this.maxLength)"
 									placeholder="MM"
 									style="width:50px"
 									name="cardExpiryMonth"
@@ -85,6 +88,7 @@
 								<input
 									type="number"
 									maxlength="2"
+									oninput="this.value=this.value.slice(0, this.maxLength)"
 									style="width:50px"
 									placeholder="YY"
 									name="cardExpiryYear"
@@ -110,6 +114,7 @@
 				<div class="control _with-tooltip">
 					<input
 						maxlength="4"
+						oninput="this.value=this.value.slice(0, this.maxLength)"
 						placeholder="CVV"
 						style="width:200px"
 						type="text"
@@ -125,6 +130,13 @@
 					<div data-bind="attr: {id: getCode() + '_cvv_error'}" generated="true" class="mage-error"></div>
 				</div>
 			</div>
+
+            <input
+                type="hidden"
+                id="kount-session-id"
+                name="sessionId"
+				data-bind="value: window.pnVars ? window.pnVars.sessionId : ''"
+            />
         </fieldset>
 		<!-- /ko -->
 

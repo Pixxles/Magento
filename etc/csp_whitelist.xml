@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<csp_whitelist xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Csp:etc/csp_whitelist.xsd">
+    <policies>
+
+        <!-- Host sources for Kaptcha -->
+        <policy id="connect-src">
+            <value id="kaptcha-tst"  type="host">https://tst.kaptcha.com</value>
+            <value id="kaptcha-prod" type="host">https://ssl.kaptcha.com</value>
+        </policy>
+
+        <!-- Consolidated script-src: both hashes and Kaptcha hosts -->
+        <policy id="script-src">
+            <values>
+                <!-- Inline script hashes -->
+                <value id="auto-form-submit-js"   type="hash" algorithm="sha256">3VcX0ULeswDp/vdckLMMQFkZorKdz+UhlK/FZo/wQzA=</value>
+                <value id="cardfield-max-input-js" type="hash" algorithm="sha256">I+cp8DSDy11m+BuFoHmk8NUf4pZ5XkoYfzJmQgS03RM=</value>
+                <!-- Kaptcha script hosts -->
+                <value id="kaptcha-tst"  type="host">https://tst.kaptcha.com</value>
+                <value id="kaptcha-prod" type="host">https://ssl.kaptcha.com</value>
+            </values>
+        </policy>
+
+        <!-- Images served by Kaptcha -->
+        <policy id="img-src">
+            <value id="kaptcha-tst"  type="host">https://tst.kaptcha.com</value>
+            <value id="kaptcha-prod" type="host">https://ssl.kaptcha.com</value>
+        </policy>
+
+        <!-- Styles loaded from Kaptcha -->
+        <policy id="style-src">
+            <value id="kaptcha-tst"  type="host">https://tst.kaptcha.com</value>
+            <value id="kaptcha-prod" type="host">https://ssl.kaptcha.com</value>
+        </policy>
+
+        <!-- Framed content from Kaptcha -->
+        <policy id="frame-src">
+            <value id="kaptcha-tst"  type="host">https://tst.kaptcha.com</value>
+            <value id="kaptcha-prod" type="host">https://ssl.kaptcha.com</value>
+        </policy>
+
+    </policies>
+</csp_whitelist>
